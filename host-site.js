@@ -1,42 +1,54 @@
+const bodyParser = require('body-parser')
 const child_process = require('child_process');
+const express = require('express')
+
+let SERVER = null
 
 const stdout = function (data) {
-    console.log(`stdout: ${data}`)
+    console.log(`${data.toString().trim()}`)
 }
 
 const stderr = function (data) {
-    console.error(`stderr: ${data}`)
+    console.error(`stderr: ${data.toString().trim()}`)
 }
 
 const error = function (error) {
-    console.error(`error: ${error}`)
-}
-
-const setupProject = function (callback) {
-    // child_process.execSync(`${changeDirectory} npm ci`, outputFunction)
-    const options = {
-        "cwd": "/home/pi/Development/RecipeSiteHost/RecipeSite"
-    }
-    const setup = child_process.spawn(`npm`, ["ci", "--omit=dev"], options)
-    setup.stdout.on("data", stdout)
-    setup.stderr.on("data", stderr)
-    setup.on("error", error)
-    setup.on("close", code => {
-        if (code === 0) {
-            callback()
-        } else {
-            console.error(`Exited with code ${code}`)
-        }
-    })
+    console.error(`error: ${error.toString().trim()}`)
 }
 
 const startServer = function () {
-    const server = child_process.spawn('./start-server.sh')
-    server.stdout.on("data", stdout)
-    server.stderr.on("data", stderr)
-    server.on("error", error)
+    SERVER = child_process.spawn('./start-server.sh')
+    SERVER.stdout.on("data", stdout)
+    SERVER.stderr.on("data", stderr)
+    SERVER.on("error", error)
+}
+
+const processUpdate = function (body) {
+    console.log(`Update App request:${JSON.stringify(body)}`)
+    if (SERVER) {
+        // Need to kill the previous server process
+        // detailed here: https://stackoverflow.com/a/56016815/1548429
+        process.kill(-SERVER.pid)
+    }
+    startServer()
+}
+
+const startWebhookListener = function () {
+    const app = express()
+    const port = 55555
+    app.use(bodyParser.json())
+
+    app.post('/update', (request, response) => {
+        processUpdate(request.body)
+        response.status(200).end()
+    })
+
+    app.listen(port, () => {
+        console.log(`Webhook listener running on port ${port}`)
+    })
 }
 
 if (require.main === module) {
     startServer()
+    startWebhookListener()
 }
