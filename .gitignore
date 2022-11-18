@@ -1,0 +1,4 @@
+node_modules/**
+RecipeSite/**
+package*.json
+
